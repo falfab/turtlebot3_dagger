@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find turtlebot3_dagger)/launch/turtlebot3_gazebo.launch"></include>
+    <include file="$(find turtlebot3_dagger)/launch/turtlebot3_fake_controller.launch"></include>
+    <include file="$(find turtlebot3_dagger)/launch/turtlebot3_master.launch"></include>
+    <!-- <node pkg="turtlebot3_dagger" type="dagger" name="dagger" output="screen"></node> -->
+</launch>
