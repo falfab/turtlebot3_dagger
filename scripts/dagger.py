@@ -10,7 +10,10 @@ from std_msgs.msg import Bool
 from gazebo_msgs.msg import ModelState
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
+from std_srvs.srv import Empty
 import cv2 as cv
+import rosnode
+
 
 class Dagger(object):
     def __init__(self):
@@ -25,6 +28,8 @@ class Dagger(object):
         self.request_to_stop = False
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.gazebo_model_pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=1)
+        self.pause_physics_client = rospy.ServiceProxy('gazebo/pause_physics', Empty)
+        self.unpause_physics_client = rospy.ServiceProxy('gazebo/unpause_physics', Empty)
 
     def load_dataset(self):
         with open('./dataset/dataset.pkl', 'rb') as fd:
@@ -74,6 +79,8 @@ class Dagger(object):
         return True
 
     def set_turtle_to_home_pose(self):
+        self.last_cmd = None
+        self.last_image = []
         home_pose = ModelState()
         home_pose.model_name = 'turtlebot3_burger_pi'
         stop_cmd = Twist()
@@ -90,20 +97,21 @@ if __name__ == '__main__':
     cmd_sub = rospy.Subscriber('/dagger/cmd_vel', Twist, dagger.cbTwist)
     stop_sub = rospy.Subscriber('/dagger/stop_policy', Bool, dagger.cbStop)
 
+    dagger.pause_physics_client()
+
     dagger.load_dataset()
     dagger.load_model()
-
     # dagger.train()
-
-    # wait until the first image and command is received
-    while len(dagger.last_image) == 0 and dagger.last_cmd == None:
-        rospy.sleep(0.1)
+    dagger.unpause_physics_client()
 
     while not rospy.is_shutdown():
         for i in range(3):
+            # wait until the first image and command is received
+            while len(dagger.last_image) == 0 and dagger.last_cmd == None:
+                print "Waiting"
+                rospy.sleep(0.1)
             while dagger.turtle_in_lane():
                 dagger.aggregate()
-
                 action = dagger.model.predict(np.reshape(dagger.last_image, (1, 64,64,3)))
 
                 cmd_msg = Twist()
@@ -117,8 +125,11 @@ if __name__ == '__main__':
                 if rospy.is_shutdown():
                     exit()
             dagger.set_turtle_to_home_pose()
+            print "AGGREGATE"
             print "STOP, i should retrain"
+            dagger.pause_physics_client()
             dagger.train()
+            dagger.unpause_physics_client()
     
     exit()
 
